@@ -1,0 +1,34 @@
+name: ecb_warehouse
+version: "0.1.0"
+config-version: 2
+profile: ecb_warehouse
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "logs"]
+
+flags:
+  send_anonymous_usage_stats: false
+
+models:
+  ecb_warehouse:
+    staging:
+      +schema: staging
+      +materialized: view
+    intermediate:
+      +schema: intermediate
+      +materialized: view
+    marts:
+      +schema: marts
+      +materialized: table
+
+seeds:
+  ecb_warehouse:
+    +schema: staging
+
+snapshots:
+  ecb_warehouse:
+    +schema: snapshots

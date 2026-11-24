@@ -1,0 +1,27 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw ECB observations loaded by ecb_ingest (one row per observation per load; all text).
+    schema: raw
+    tables:
+      - name: exr
+        description: ECB reference exchange rates (EXR), foreign currency per 1 EUR, ECB working days.
+        # Data freshness: age of the newest observation date (spec §7: warn 24 h, error 72 h).
+        loaded_at_field: "cast(time_period as timestamp)"
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 72, period: hour}
+      - name: est
+        description: Euro short-term rate (EST); WT = rate in %, TT = total volume in EUR millions.
+      - name: fm
+        description: ECB key interest rates (FM), DFR / MRR_FR / MLFR level in %, one row per calendar day.
+      - name: hicp
+        description: Euro-area HICP inflation, annual rate of change in %, monthly.
+
+  - name: ops
+    description: Pipeline metadata written by ecb_ingest.
+    schema: ops
+    tables:
+      - name: pipeline_runs
+        description: One row per load attempt per dataset, plus one 'all' row per fully successful DAG run.

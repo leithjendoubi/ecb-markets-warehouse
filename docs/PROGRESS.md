@@ -58,3 +58,29 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 
 **Open issues**
 - The watermark is advanced by the loader (M3); until then nothing moves it in production.
+
+## M3: Loader, ops.pipeline_runs, Airflow DAG (2026-11-24)
+**Built**
+- DDL: `raw.exr/est/fm/hicp` (configured API columns as text + load_id, row_num, extracted_at, ingested_at,
+  source_url, s3_key; PK (load_id, row_num)), `ops.pipeline_runs` (FR-09 columns + mode, dag_run_id, error).
+  A unit test keeps `02_raw.sql` in sync with `config.yaml`.
+- `load.py`: one transaction = delete by load_id + COPY + pipeline_runs row; row-count cross-checks
+  (file vs manifest, copied vs stored); failures roll back and are logged as `failed`; watermark advanced after commit.
+- `airflow/dags/ecb_daily.py`: Mon-Fri 18:00 Europe/Berlin, catchup=False, max_active_runs=1, retries x3 with
+  exponential backoff, `extract` and `load` dynamically mapped over 4 datasets (loads serialised), then
+  `dbt build` -> `dbt source freshness` -> `record_run` (writes the 'all' row used for run-time stats).
+  Params `start`/`end` = backfill (`make backfill START=.. END=..`).
+- dbt skeleton (project, env-var profile, sources with EXR freshness warn 24 h / error 72 h).
+- `scripts/raw_counts.sql`, `scripts/checksum.sql`, `scripts/benchmark.sql`.
+
+**Checks**
+- First DAG run (full history) succeeded: exr 30,450 / est 3,662 / fm 27,539 / hicp 142 rows (ops.pipeline_runs).
+- DAG run again the same day (twice: the unpause-scheduled run and a manual run): every load `no_data`;
+  `scripts/raw_counts.sql` before/after: identical counts and checksums.
+- 2-year backfill 2024-11-25..2026-11-24 run twice: exr 5,090 / est 1,018 / fm 2,190 / hicp 23 rows each time;
+  raw counts + checksums identical after the re-run; watermarks unchanged by the backfill.
+- `make test` + integration: 50 passed (incl. load-twice idempotency, failure rollback, no_data path).
+- `make dag-test`: no import errors, 5 DAG structure tests passed (inside the Airflow container).
+
+**Open issues**
+- Unpausing a `catchup=False` DAG immediately schedules the latest cron slot once (Airflow behaviour); harmless here.

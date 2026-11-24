@@ -90,6 +90,7 @@ dag-test:
 	$(AF) airflow dags reserialize
 	$(AF) airflow dags list-import-errors
 	$(AF) airflow dags list
+	$(AF) python /opt/project/tests/dags/test_ecb_daily.py
 
 ## Trigger one normal (incremental) run of the DAG.
 trigger:

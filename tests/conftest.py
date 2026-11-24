@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import io
 import os
 from pathlib import Path
@@ -11,6 +12,14 @@ import pytest
 from botocore.exceptions import ClientError
 
 from ecb_ingest.s3 import S3Store
+
+# The DAG tests need Airflow, which only exists in the Airflow container (make dag-test). Check a real
+# Airflow module: the repo's own airflow/ folder is importable as a namespace package.
+try:
+    _has_airflow = importlib.util.find_spec("airflow.dag_processing") is not None
+except ModuleNotFoundError:
+    _has_airflow = False
+collect_ignore: list[str] = [] if _has_airflow else ["dags"]
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"

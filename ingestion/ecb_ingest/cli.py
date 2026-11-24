@@ -2,6 +2,8 @@
 
     python -m ecb_ingest.cli ensure-bucket
     python -m ecb_ingest.cli extract --dataset exr [--start YYYY-MM-DD --end YYYY-MM-DD] [--run-id ID]
+    python -m ecb_ingest.cli load --dataset exr --load-id exr-full-20261124T170000Z [--run-id ID]
+    python -m ecb_ingest.cli record-run --run-id ID --started-at 2026-11-24T17:00:00+00:00
 
 Logs go to stderr. The last stdout line is the machine-readable result (Airflow pushes it to XCom).
 """
@@ -12,12 +14,16 @@ import argparse
 import json
 import logging
 import sys
+from datetime import datetime
+
+import psycopg
 
 from ecb_ingest.client import EcbClient
 from ecb_ingest.config import load_config
 from ecb_ingest.extract import run_extract
+from ecb_ingest.load import read_manifest, record_dag_run, run_load
 from ecb_ingest.s3 import S3Store, make_client
-from ecb_ingest.settings import EcbSettings, S3Settings
+from ecb_ingest.settings import EcbSettings, S3Settings, WarehouseSettings
 from ecb_ingest.state import WatermarkStore
 
 log = logging.getLogger("ecb_ingest")
@@ -57,6 +63,37 @@ def cmd_extract(args: argparse.Namespace) -> int:
     return 0
 
 
+def _connect() -> psycopg.Connection:
+    return psycopg.connect(WarehouseSettings.from_env().conninfo(), autocommit=True)
+
+
+def cmd_load(args: argparse.Namespace) -> int:
+    cfg = load_config()[args.dataset]
+    store = _store()
+    manifest = read_manifest(store, args.dataset, args.load_id)
+    with _connect() as conn:
+        result = run_load(
+            cfg, manifest, conn=conn, store=store, watermarks=WatermarkStore(store), dag_run_id=args.run_id or None
+        )
+    _emit(
+        {
+            "dataset": result.dataset,
+            "load_id": result.load_id,
+            "status": result.status,
+            "rows_loaded": result.rows_loaded,
+            "watermark_advanced": result.watermark_advanced,
+        }
+    )
+    return 0
+
+
+def cmd_record_run(args: argparse.Namespace) -> int:
+    with _connect() as conn:
+        loaded = record_dag_run(conn, dag_run_id=args.run_id, started_at=datetime.fromisoformat(args.started_at))
+    _emit({"run_id": args.run_id, "rows_loaded": loaded})
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="ecb-ingest")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -68,6 +105,17 @@ def build_parser() -> argparse.ArgumentParser:
     ex.add_argument("--end", help="backfill end (YYYY-MM-DD); needs --start")
     ex.add_argument("--run-id", help="orchestrator run id, recorded in the manifest")
     ex.set_defaults(func=cmd_extract)
+
+    ld = sub.add_parser("load", help="load a landed file into raw.<dataset> (idempotent per load_id)")
+    ld.add_argument("--dataset", required=True, choices=sorted(load_config()))
+    ld.add_argument("--load-id", required=True)
+    ld.add_argument("--run-id", help="orchestrator run id, recorded in ops.pipeline_runs")
+    ld.set_defaults(func=cmd_load)
+
+    rr = sub.add_parser("record-run", help="log a fully successful DAG run in ops.pipeline_runs")
+    rr.add_argument("--run-id", required=True)
+    rr.add_argument("--started-at", required=True, help="ISO-8601 with timezone")
+    rr.set_defaults(func=cmd_record_run)
     return parser
 
 
