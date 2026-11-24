@@ -1,0 +1,11 @@
+snapshots:
+  - name: snap_currency
+    description: SCD Type 2 history of seeds/currency_reference.csv (check strategy, FR-07).
+    relation: ref('currency_reference')
+    config:
+      schema: snapshots
+      unique_key: currency_code
+      strategy: check
+      check_cols: [currency_name, status, last_rate_date, notes]
+      hard_deletes: invalidate
+      dbt_valid_to_current: "cast('9999-12-31' as timestamp)"

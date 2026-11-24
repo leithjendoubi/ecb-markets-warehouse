@@ -1,0 +1,33 @@
+version: 2
+
+seeds:
+  - name: currency_reference
+    description: >
+      Hand-maintained currency reference list, the source of the SCD2 currency dimension (snapshot
+      snap_currency). Names are taken from the ECB series titles (raw.exr.title; HRK from
+      tests/fixtures/exr_hrk.csv). Edit this file to record a change; the next snapshot versions it.
+    config:
+      column_types:
+        currency_code: varchar(3)
+        currency_name: text
+        status: text
+        last_rate_date: date
+        notes: text
+    columns:
+      - name: currency_code
+        description: ISO 4217 code.
+        data_tests: [unique, not_null]
+      - name: currency_name
+        description: Currency name as in the ECB series title.
+        data_tests: [not_null]
+      - name: status
+        description: active (ECB publishes a reference rate) or discontinued.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [active, discontinued]
+      - name: last_rate_date
+        description: Last ECB reference rate date for discontinued currencies.
+      - name: notes
+        description: Free-text context for the change.

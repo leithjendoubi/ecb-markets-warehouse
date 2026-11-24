@@ -1,0 +1,2 @@
+# psql script with :variables (not parseable SQL)
+sql/init/ddl/01_schemas.sql

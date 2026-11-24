@@ -1,0 +1,33 @@
+[sqlfluff]
+dialect = postgres
+# Jinja templater with dbt builtins (ref/source/config...) so linting needs no database connection.
+templater = jinja
+max_line_length = 120
+exclude_rules = ST06
+large_file_skip_byte_limit = 50000
+
+[sqlfluff:templater:jinja]
+apply_dbt_builtins = True
+load_macros_from_path = dbt/ecb_warehouse/macros,dbt/ecb_warehouse/tests/generic
+
+[sqlfluff:indentation]
+tab_space_size = 4
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.literals]
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.types]
+extended_capitalisation_policy = lower
+
+[sqlfluff:rules:aliasing.length]
+min_alias_length = 1
+
+[sqlfluff:rules:references.keywords]
+# spec column names (ops.pipeline_runs.mode, the checksum output of scripts/checksum.sql)
+ignore_words = checksum,mode

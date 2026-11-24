@@ -8,4 +8,4 @@ select
         )
     ) as checksum
 from marts.fct_fx_rate_daily as f
-inner join marts.dim_currency as c using (currency_sk);
+inner join marts.dim_currency as c on f.currency_sk = c.currency_sk;

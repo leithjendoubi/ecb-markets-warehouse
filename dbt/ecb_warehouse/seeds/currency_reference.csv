@@ -1,0 +1,12 @@
+currency_code,currency_name,status,last_rate_date,notes
+AUD,Australian dollar,active,,
+CAD,Canadian dollar,active,,
+CHF,Swiss franc,active,,
+CNY,Chinese yuan renminbi,active,,
+GBP,Pound sterling,active,,
+JPY,Japanese yen,active,,
+NOK,Norwegian krone,active,,
+PLN,Polish zloty,active,,
+SEK,Swedish krona,active,,
+USD,US dollar,active,,
+HRK,Croatian kuna,discontinued,2022-12-30,Croatia adopted the euro on 2023-01-01; last ECB reference rate 2022-12-30

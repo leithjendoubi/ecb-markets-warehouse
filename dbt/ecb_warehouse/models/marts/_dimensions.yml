@@ -1,0 +1,79 @@
+version: 2
+
+models:
+  - name: dim_date
+    description: >
+      Calendar day 1999-01-01..2030-12-31 (full rebuild). One row per day. Flags for weekends, TARGET closing
+      days, TARGET business days (calendar) and ECB working days (days with EXR reference rates in the data).
+    columns:
+      - name: date_key
+        description: Integer key YYYYMMDD.
+        data_tests: [unique, not_null]
+      - name: full_date
+        description: Calendar date.
+        data_tests: [unique, not_null]
+      - name: year_number
+        description: Calendar year.
+      - name: quarter_number
+        description: Calendar quarter 1-4.
+      - name: month_number
+        description: Calendar month 1-12.
+      - name: month_name
+        description: English month name.
+      - name: month_start
+        description: First day of the month.
+      - name: month_end
+        description: Last day of the month.
+      - name: day_of_month
+        description: Day of month 1-31.
+      - name: iso_day_of_week
+        description: ISO day of week, 1 = Monday .. 7 = Sunday.
+      - name: day_name
+        description: English day name.
+      - name: iso_week
+        description: ISO week number.
+      - name: is_weekend
+        description: Saturday or Sunday.
+      - name: is_target_holiday
+        description: TARGET closing day (1 Jan, Good Friday, Easter Monday, 1 May, 25 Dec, 26 Dec).
+      - name: is_target_business_day
+        description: Not a weekend and not a TARGET closing day.
+      - name: is_ecb_working_day
+        description: The ECB published reference rates on this day (derived from EXR data; false for future days).
+      - name: is_month_end
+        description: Last calendar day of the month.
+
+  - name: dim_currency
+    description: >
+      SCD Type 2 currency dimension (one row per currency version) from snapshot snap_currency over the seed
+      currency_reference. valid_from inclusive, valid_to exclusive; the current version has
+      valid_to = 9999-12-31 and is_current = true.
+    columns:
+      - name: currency_sk
+        description: Surrogate key of the currency version (dbt_scd_id).
+        data_tests: [unique, not_null]
+      - name: currency_code
+        description: ISO 4217 code.
+        data_tests: [not_null]
+      - name: currency_name
+        description: Name in this version.
+      - name: status
+        description: active or discontinued in this version.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [active, discontinued]
+      - name: last_rate_date
+        description: Last ECB reference rate date for discontinued currencies.
+      - name: notes
+        description: Context for the version.
+      - name: version_number
+        description: 1 for the first version of the currency, then 2, 3, ...
+      - name: valid_from
+        description: Version start (inclusive). Version 1 is back-dated to 1999-01-01.
+      - name: valid_to
+        description: Version end (exclusive); 9999-12-31 for the current version.
+      - name: is_current
+        description: True for the current version.
+        data_tests:
+          - not_null

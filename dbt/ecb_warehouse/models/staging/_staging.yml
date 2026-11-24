@@ -1,0 +1,185 @@
+version: 2
+
+models:
+  - name: stg_ecb__exr
+    description: >
+      ECB euro foreign exchange reference rates, one row per currency per ECB working day. Latest version per
+      (series_key, time_period) across all loads (FR-05). Rates are units of foreign currency per 1 EUR and
+      are non-additive: never sum them.
+    data_tests:
+      - unique_combination:
+          columns: [series_key, time_period]
+    columns:
+      - name: series_key
+        description: ECB series key as returned by the API, e.g. EXR.D.USD.EUR.SP00.A.
+        data_tests: [not_null]
+      - name: time_period
+        description: Observation period as sent by the API (YYYY-MM-DD).
+        data_tests: [not_null]
+      - name: currency_code
+        description: ISO 4217 code of the quoted currency.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [USD, GBP, CHF, JPY, CNY, SEK, NOK, PLN, CAD, AUD]
+      - name: base_currency_code
+        description: Denominator currency; always EUR for this series.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [EUR]
+      - name: rate_date
+        description: Observation date.
+        data_tests: [not_null]
+      - name: rate_per_eur
+        description: Foreign currency units per 1 EUR, numeric(18,6).
+        data_tests:
+          - not_null
+          - expression_is_true:
+              arguments:
+                expression: "rate_per_eur > 0"
+      - name: obs_status
+        description: SDMX observation status (A = normal value).
+      - name: series_title
+        description: Series title from the API.
+      - name: load_id
+        description: Load that delivered this version of the observation.
+      - name: extracted_at
+        description: When that load called the API (UTC).
+
+  - name: stg_ecb__est
+    description: >
+      Euro short-term rate observations in long form, one row per measure per TARGET business day.
+      measure_code WT = volume-weighted trimmed mean rate (%), TT = total volume (EUR millions).
+    data_tests:
+      - unique_combination:
+          columns: [series_key, time_period]
+    columns:
+      - name: series_key
+        description: ECB series key, EST.B.EU000A2X2A25.WT or .TT.
+        data_tests: [not_null]
+      - name: time_period
+        description: Observation period as sent by the API.
+        data_tests: [not_null]
+      - name: measure_code
+        description: WT (rate) or TT (total volume).
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [WT, TT]
+      - name: obs_date
+        description: Observation date.
+        data_tests: [not_null]
+      - name: obs_value
+        description: Rate in percent (WT) or volume in EUR millions (TT).
+        data_tests: [not_null]
+      - name: unit_measure
+        description: PC (percent) for WT, EUR for TT.
+      - name: unit_mult
+        description: Power-of-ten multiplier; 6 for TT (millions).
+      - name: obs_status
+        description: SDMX observation status.
+      - name: load_id
+        description: Load that delivered this version.
+      - name: extracted_at
+        description: When that load called the API (UTC).
+
+  - name: stg_ecb__fm
+    description: >
+      ECB key interest rates (deposit facility DFR, main refinancing fixed rate MRR_FR, marginal lending MLFR)
+      in percent. The API delivers one row per calendar day, so change days are derived downstream.
+    data_tests:
+      - unique_combination:
+          columns: [series_key, time_period]
+    columns:
+      - name: series_key
+        description: ECB series key, e.g. FM.D.U2.EUR.4F.KR.DFR.LEV.
+        data_tests: [not_null]
+      - name: time_period
+        description: Observation period as sent by the API.
+        data_tests: [not_null]
+      - name: rate_code
+        description: DFR, MRR_FR or MLFR.
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [DFR, MRR_FR, MLFR]
+      - name: rate_date
+        description: Calendar date.
+        data_tests: [not_null]
+      - name: rate_pct
+        description: Rate level in percent (can be negative).
+        data_tests: [not_null]
+      - name: obs_status
+        description: SDMX observation status.
+      - name: load_id
+        description: Load that delivered this version.
+      - name: extracted_at
+        description: When that load called the API (UTC).
+
+  - name: stg_ecb__hicp
+    description: Euro-area HICP inflation, all items, annual rate of change in percent, one row per month.
+    data_tests:
+      - unique_combination:
+          columns: [series_key, time_period]
+    columns:
+      - name: series_key
+        description: ECB series key HICP.M.U2.N.000000.4D0.ANR.
+        data_tests: [not_null]
+      - name: time_period
+        description: Month as sent by the API (YYYY-MM).
+        data_tests: [not_null]
+      - name: month_start
+        description: First day of the month.
+        data_tests: [not_null, unique]
+      - name: hicp_yoy_pct
+        description: Year-on-year change of the HICP in percent.
+        data_tests: [not_null]
+      - name: obs_status
+        description: SDMX observation status.
+      - name: load_id
+        description: Load that delivered this version.
+      - name: extracted_at
+        description: When that load called the API (UTC).
+
+  - name: stg_ops__pipeline_runs
+    description: Typed pipeline run log (one row per load attempt, plus one 'all' row per successful DAG run).
+    columns:
+      - name: run_pk
+        description: Surrogate key of the run row.
+        data_tests: [unique, not_null]
+      - name: dataset
+        description: exr, est, fm, hicp, or 'all' for a whole DAG run.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [exr, est, fm, hicp, all]
+      - name: load_id
+        description: Load id (or the DAG run id for 'all' rows).
+      - name: mode
+        description: full, incremental, backfill or dag_run.
+      - name: dag_run_id
+        description: Airflow run id.
+      - name: rows_extracted
+        description: Rows in the landed file.
+      - name: rows_loaded
+        description: Rows stored in raw for this load_id.
+      - name: started_at
+        description: Extraction start (UTC).
+      - name: finished_at
+        description: Load commit time (UTC).
+      - name: status
+        description: success, no_data or failed.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [success, no_data, failed]
+      - name: error
+        description: Error text for failed loads.
+      - name: run_date_berlin
+        description: Calendar date of started_at in Europe/Berlin (the schedule's timezone).
+      - name: duration_seconds
+        description: finished_at minus started_at, in seconds.

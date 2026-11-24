@@ -84,3 +84,26 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 
 **Open issues**
 - Unpausing a `catchup=False` DAG immediately schedules the latest cron slot once (Airflow behaviour); harmless here.
+
+## M4: dbt sources, staging, dim_date, seed + snapshot, dim_currency (2026-11-24)
+**Built**
+- Sources `raw.exr/est/fm/hicp`, `ops.pipeline_runs`; EXR freshness warn 24 h / error 72 h, measured from
+  16:00 Europe/Berlin on the observation date (ADR 0005).
+- Staging views `stg_ecb__exr/est/fm/hicp` (typed, latest version per (series_key, time_period) via macro
+  `latest_observation`), `stg_ops__pipeline_runs`.
+- `dim_date` (1999-2030, weekend / TARGET holiday / TARGET business day / ECB working day flags; ADR 0004).
+- Seed `currency_reference` (names from ECB titles, HRK discontinued), YAML snapshot `snap_currency` (check),
+  SCD2 `dim_currency` (ADR 0006). Generic tests `unique_combination`, `expression_is_true`; singular tests for
+  one current row per currency, non-overlapping versions, EXR only on TARGET business days.
+- `.sqlfluff` (jinja templater + dbt builtins, lowercase policy), `DBT_SCHEMA_PREFIX` for throwaway builds.
+
+**Checks**
+- `make dbt-build`: PASS=59 WARN=0 ERROR=0.
+- `make freshness`: raw.exr PASS.
+- Calendar cross-check 2015-01-02..2026-11-23: 3,045 TARGET business days = 3,045 ECB working days, 0 mismatches.
+- SCD2: `tests/integration/test_scd2_currency.py` changes SEK in a temp seed copy -> v1 closed, v2 current;
+  USD still one version; dim tests pass. Throwaway schemas dropped afterwards.
+- `make lint` (ruff + sqlfluff) clean; pytest 51 passed (unit + integration).
+
+**Open issues**
+- dbt prints "dbt v2 is available"; staying on dbt-core 1.12 as pinned in pyproject.toml.

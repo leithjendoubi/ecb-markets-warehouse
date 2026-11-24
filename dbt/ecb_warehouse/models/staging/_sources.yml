@@ -7,8 +7,10 @@ sources:
     tables:
       - name: exr
         description: ECB reference exchange rates (EXR), foreign currency per 1 EUR, ECB working days.
-        # Data freshness: age of the newest observation date (spec §7: warn 24 h, error 72 h).
-        loaded_at_field: "cast(time_period as timestamp)"
+        # Data freshness (spec §7: warn 24 h, error 72 h) = time since the newest rate was published.
+        # ECB reference rates are published around 16:00 CET on the observation day, so age is measured
+        # from 16:00 Europe/Berlin on time_period (ADR 0005).
+        loaded_at_field: "((cast(time_period as date) + time '16:00') at time zone 'Europe/Berlin')"
         freshness:
           warn_after: {count: 24, period: hour}
           error_after: {count: 72, period: hour}
