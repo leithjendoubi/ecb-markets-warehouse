@@ -45,3 +45,19 @@ Metabase connects to `warehouse` as the read-only user `WAREHOUSE_RO_USER`, whic
 - **Changed pinned Python deps**: `make up` rebuilds the Airflow image. Code changes in `ingestion/`, `dbt/` and
   `airflow/dags/` are bind-mounted and need no rebuild.
 - **S3 smoke test**: `make test-integration` (boto3 upload/read/delete against :8333).
+
+## Data operations
+| Task | Command |
+|---|---|
+| Normal run now | `make trigger` |
+| Backfill a range (watermarks untouched) | `make backfill START=2024-01-01 END=2024-12-31` |
+| Rebuild all dbt models from raw | `docker compose exec airflow-scheduler bash -c "cd /opt/project/dbt/ecb_warehouse && /opt/pipeline-venv/bin/dbt build --full-refresh"` |
+| Idempotency proof | `make checksum` (spec query) |
+| Docs + lineage check | `make docs-check` |
+| Run-time statistics | `make benchmark` (from ops.pipeline_runs) |
+
+- A revision older than the 7-day look-back is only picked up by a full refresh (ADR 0008).
+- To version a currency (SCD2): edit `dbt/ecb_warehouse/seeds/currency_reference.csv`; the next DAG run
+  (`dbt build` = seed + snapshot + models) creates the new version (ADR 0006).
+- To restart incremental extraction from scratch for one dataset, remove its entry from
+  `s3://$S3_BUCKET/_state/watermarks.json`; the next run is a full load.

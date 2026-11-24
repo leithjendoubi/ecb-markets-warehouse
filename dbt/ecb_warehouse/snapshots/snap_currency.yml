@@ -9,3 +9,14 @@ snapshots:
       check_cols: [currency_name, status, last_rate_date, notes]
       hard_deletes: invalidate
       dbt_valid_to_current: "cast('9999-12-31' as timestamp)"
+    columns:
+      - name: currency_code
+        description: ISO 4217 code (snapshot unique key).
+      - name: currency_name
+        description: Currency name in this version.
+      - name: status
+        description: active or discontinued in this version.
+      - name: last_rate_date
+        description: Last ECB reference rate date for discontinued currencies.
+      - name: notes
+        description: Context for the version.

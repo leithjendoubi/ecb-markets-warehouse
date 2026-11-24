@@ -107,3 +107,30 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 
 **Open issues**
 - dbt prints "dbt v2 is available"; staying on dbt-core 1.12 as pinned in pyproject.toml.
+
+## M5: Facts, marts, singular tests, docs (2026-11-24)
+**Built**
+- Facts (incremental delete+insert, ADR 0008): `fct_fx_rate_daily` (rate, previous rate, daily return %,
+  30-day vol), `fct_policy_rate_daily` (calendar spine, bounded forward fill, is_change_day; ADR 0007),
+  `fct_estr_daily`, `fct_inflation_monthly`. Intermediate pivots `int_policy_rates_pivoted`, `int_estr_pivoted`.
+- Marts: `mart_rates_monthly` (avg EUR STR, month-end DFR/MRO/MLF, HICP YoY, real EUR STR and real DFR),
+  `mart_fx_performance` (MTD/YTD change, month-end 30-day vol), `mart_pipeline_health` (Q4; Metabase reads marts only).
+- Tests: FK relationships, grain uniqueness, rate > 0, |daily return| < 10 (warn), no missing working days
+  (warn), policy spine contiguous, rows loaded > 0 on working days (error), docs for every model/column.
+- `scripts/fact_checksums.sql`, `scripts/check_dbt_docs.py` (+ unit test), `make docs-check`.
+
+**Checks**
+- `make dbt-build`: PASS=114 WARN=1 ERROR=0. The warning is real data: CHF 2015-01-15, -14.40% (SNB removed
+  the EUR/CHF floor); severity warn per spec §7.
+- Full refresh = incremental: identical row counts and checksums for all 4 facts after (a) a normal incremental
+  run, (b) deleting the last 20 days and running incrementally, (c) `--full-refresh`.
+  Spec checksum: n = 30,450, md5 f025dcf3c13a34e30c3201007da042f8.
+- Lineage/docs: `make docs-check` -> "checked 23 nodes: OK" (every node and DB column documented, every model has parents).
+- `make lint` clean; pytest 56 passed (unit + integration).
+
+**Found**
+- MRR_FR has no data 2000-06-28..2008-10-14 (variable-rate tenders); bounded forward fill keeps MRO NULL there
+  (ADR 0007). The ECB minimum bid rate series covers that gap and is listed as an optional extension.
+
+**Open issues**
+- ECB revisions older than the 7-day look-back need `dbt build --full-refresh` (documented in ADR 0008).

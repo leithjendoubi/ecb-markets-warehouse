@@ -70,4 +70,4 @@ def test_seed_change_creates_new_scd2_version(project):
     assert _versions(prefix, "USD") == [(1, "active", True, True)]  # unchanged rows keep one version
 
     # spec §7 dim tests (one current per currency, no overlaps) still pass
-    _dbt(path, "test", *selector)
+    _dbt(path, "test", *selector, "--indirect-selection", "cautious")

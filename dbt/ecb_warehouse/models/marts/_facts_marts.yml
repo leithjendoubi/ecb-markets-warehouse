@@ -1,0 +1,261 @@
+version: 2
+
+models:
+  # ---------------------------------------------------------------- facts
+  - name: fct_fx_rate_daily
+    description: >
+      ECB euro reference exchange rates. Grain: currency x ECB working day. Incremental delete+insert on
+      (currency_code, full_date) with a 7-day look-back. Rates are non-additive: average or compare, never sum.
+    data_tests:
+      - unique_combination:
+          columns: [currency_code, full_date]
+    columns:
+      - name: currency_sk
+        description: FK to dim_currency, the currency version valid on full_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_currency')
+                field: currency_sk
+      - name: date_key
+        description: FK to dim_date (YYYYMMDD).
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: currency_code
+        description: ISO 4217 code of the quoted currency (degenerate attribute for convenience).
+        data_tests: [not_null]
+      - name: full_date
+        description: Rate date.
+        data_tests: [not_null]
+      - name: rate_per_eur
+        description: Foreign currency units per 1 EUR, numeric(18,6).
+        data_tests:
+          - not_null
+          - expression_is_true:
+              arguments:
+                expression: "rate_per_eur > 0"
+      - name: prev_rate_per_eur
+        description: Rate on the previous ECB working day (NULL on the first day).
+      - name: daily_return_pct
+        description: Percent change vs the previous working day; positive = euro strengthened.
+        data_tests:
+          - expression_is_true:
+              arguments:
+                expression: "daily_return_pct is null or abs(daily_return_pct) < 10"
+              config:
+                severity: warn
+      - name: vol_30d_pct
+        description: >
+          Sample standard deviation of the last 30 daily returns (percent, not annualised); NULL until 30
+          returns exist.
+
+  - name: fct_policy_rate_daily
+    description: >
+      ECB key interest rates on a calendar-day spine. Grain: calendar day. DFR, MRO (fixed rate) and MLF
+      forward-filled over at most 7 days without an observation; MRO is NULL 2000-06-28..2008-10-14 when the
+      ECB ran variable-rate tenders (ADR 0007).
+    columns:
+      - name: date_key
+        description: FK to dim_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: full_date
+        description: Calendar date.
+        data_tests: [unique, not_null]
+      - name: dfr_pct
+        description: Deposit facility rate, percent.
+        data_tests: [not_null]
+      - name: mro_pct
+        description: Main refinancing operations fixed rate, percent (NULL during variable-rate tenders).
+      - name: mlf_pct
+        description: Marginal lending facility rate, percent.
+        data_tests: [not_null]
+      - name: is_dfr_filled
+        description: True if the DFR value was carried forward (no observation that day).
+      - name: is_change_day
+        description: True if any of the three rates differs from the previous day.
+        data_tests: [not_null]
+
+  - name: fct_estr_daily
+    description: Euro short-term rate. Grain - TARGET business day with a published EUR STR (from 2019-10-01).
+    columns:
+      - name: date_key
+        description: FK to dim_date.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: full_date
+        description: Reference date of the rate.
+        data_tests: [unique, not_null]
+      - name: estr_pct
+        description: EUR STR, volume-weighted trimmed mean rate, percent.
+        data_tests: [not_null]
+      - name: total_volume_eur_mn
+        description: Total volume of the underlying transactions, EUR millions (additive across days).
+        data_tests:
+          - expression_is_true:
+              arguments:
+                expression: "total_volume_eur_mn > 0"
+
+  - name: fct_inflation_monthly
+    description: Euro-area HICP annual inflation. Grain - month. Incremental with a 12-month look-back.
+    columns:
+      - name: month_start_date_key
+        description: FK to dim_date for the first day of the month.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: month_start
+        description: First day of the month.
+        data_tests: [unique, not_null]
+      - name: month_key
+        description: Month as integer YYYYMM.
+        data_tests: [unique, not_null]
+      - name: hicp_yoy_pct
+        description: HICP all items, annual rate of change, percent.
+        data_tests: [not_null]
+      - name: hicp_yoy_change_pp
+        description: Change of the annual rate vs the previous month, percentage points.
+
+  # ---------------------------------------------------------------- marts
+  - name: mart_rates_monthly
+    description: >
+      Monthly rates overview (Q2, Q3). Grain - month from 1999-01. Average EUR STR, key rates at month end,
+      HICP YoY and real rates (nominal minus HICP YoY). Rates are averaged, never summed.
+    columns:
+      - name: month_key
+        description: Month as integer YYYYMM.
+        data_tests: [unique, not_null]
+      - name: month_start
+        description: First day of the month.
+        data_tests: [unique, not_null]
+      - name: avg_estr_pct
+        description: Average EUR STR over the month's publication days (NULL before 2019-10).
+      - name: estr_days
+        description: Number of EUR STR publication days in the month.
+      - name: policy_as_of_date
+        description: Day the month-end key rates are taken from (last day of month, or latest available).
+      - name: dfr_month_end_pct
+        description: Deposit facility rate at month end, percent.
+      - name: mro_month_end_pct
+        description: MRO fixed rate at month end, percent (NULL during variable-rate tenders).
+      - name: mlf_month_end_pct
+        description: Marginal lending facility rate at month end, percent.
+      - name: policy_change_days
+        description: Days in the month on which any key rate changed.
+      - name: hicp_yoy_pct
+        description: HICP annual inflation for the month, percent.
+      - name: real_estr_pct
+        description: avg_estr_pct minus hicp_yoy_pct (percentage points).
+      - name: real_dfr_pct
+        description: dfr_month_end_pct minus hicp_yoy_pct (percentage points); covers years before EUR STR.
+
+  - name: mart_fx_performance
+    description: >
+      FX performance per currency and month (Q1). Positive changes mean the euro strengthened against the
+      currency. MTD vs previous month-end, YTD vs previous year-end, 30-day volatility at month end.
+    data_tests:
+      - unique_combination:
+          columns: [currency_code, month_start]
+    columns:
+      - name: currency_code
+        description: ISO 4217 code.
+        data_tests: [not_null]
+      - name: currency_name
+        description: Current name from dim_currency.
+      - name: month_start
+        description: First day of the month.
+        data_tests: [not_null]
+      - name: month_key
+        description: Month as integer YYYYMM.
+      - name: first_rate_date
+        description: First rate date in the month.
+      - name: last_rate_date
+        description: Last rate date in the month (month-end, or latest for the current month).
+      - name: rate_days
+        description: Number of ECB working days with a rate in the month.
+      - name: avg_rate_per_eur
+        description: Average of the daily rates in the month.
+      - name: min_rate_per_eur
+        description: Lowest daily rate in the month.
+      - name: max_rate_per_eur
+        description: Highest daily rate in the month.
+      - name: month_end_rate_per_eur
+        description: Rate on last_rate_date.
+      - name: mtd_change_pct
+        description: Percent change vs the previous month-end rate (NULL for the first month).
+      - name: ytd_change_pct
+        description: Percent change vs the previous year-end rate (NULL in the first year).
+      - name: month_end_vol_30d_pct
+        description: 30-day volatility (daily, not annualised) on last_rate_date.
+
+  - name: mart_pipeline_health
+    description: >
+      Pipeline health per dataset and run date in Europe/Berlin (Q4), from ops.pipeline_runs, plus the newest
+      observation available per dataset.
+    data_tests:
+      - unique_combination:
+          columns: [dataset, run_date_berlin]
+    columns:
+      - name: dataset
+        description: exr, est, fm or hicp.
+        data_tests: [not_null]
+      - name: run_date_berlin
+        description: Calendar day (Europe/Berlin) the loads started.
+        data_tests: [not_null]
+      - name: load_attempts
+        description: Number of load attempts that day.
+      - name: successful_loads
+        description: Loads with rows.
+      - name: no_data_loads
+        description: Loads that found no new observations.
+      - name: failed_loads
+        description: Loads that failed (rolled back).
+      - name: rows_loaded
+        description: Rows loaded by non-failed loads that day.
+      - name: last_finished_at
+        description: Latest load finish time that day.
+      - name: max_duration_seconds
+        description: Longest extract+load duration that day, seconds.
+      - name: latest_observation
+        description: Newest observation date in the dataset's fact table (month start for HICP).
+
+  # ---------------------------------------------------------------- intermediate
+  - name: int_policy_rates_pivoted
+    description: Key rates pivoted to one row per observed date; NULL where a rate has no observation.
+    columns:
+      - name: rate_date
+        description: Observation date.
+        data_tests: [unique, not_null]
+      - name: dfr_pct
+        description: Deposit facility rate, percent.
+      - name: mro_pct
+        description: MRO fixed rate, percent.
+      - name: mlf_pct
+        description: Marginal lending facility rate, percent.
+
+  - name: int_estr_pivoted
+    description: EUR STR rate (WT) and total volume (TT) side by side, one row per observation date.
+    columns:
+      - name: obs_date
+        description: Observation date.
+        data_tests: [unique, not_null]
+      - name: estr_pct
+        description: EUR STR, percent.
+      - name: total_volume_eur_mn
+        description: Total volume, EUR millions.

@@ -1,6 +1,8 @@
 import re
 from datetime import UTC, datetime
 
+import yaml
+
 from ecb_ingest.config import load_config
 from ecb_ingest.extract import Manifest
 from ecb_ingest.load import META_COLUMNS, build_rows
@@ -51,3 +53,12 @@ def test_raw_ddl_matches_config():
     for cfg in load_config().values():
         expected = [*cfg.columns.values(), *META_COLUMNS[:3], "ingested_at", *META_COLUMNS[3:]]
         assert _ddl_columns(cfg.raw_table) == expected, cfg.raw_table
+
+
+def test_raw_columns_are_documented_in_dbt_sources():
+    doc = yaml.safe_load((ROOT / "dbt/ecb_warehouse/models/staging/_sources.yml").read_text(encoding="utf-8"))
+    raw = next(s for s in doc["sources"] if s["name"] == "raw")
+    tables = {t["name"]: [c["name"] for c in t.get("columns", [])] for t in raw["tables"]}
+    for name, cfg in load_config().items():
+        expected = [*cfg.columns.values(), *META_COLUMNS[:3], "ingested_at", *META_COLUMNS[3:]]
+        assert tables[name] == expected, name

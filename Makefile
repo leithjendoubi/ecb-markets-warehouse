@@ -21,7 +21,7 @@ WAREHOUSE_DB ?= warehouse
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U $(WAREHOUSE_USER) -d $(WAREHOUSE_DB)
 
 .PHONY: help env venv build up down logs ps psql migrate test test-integration lint format \
-        dbt-build dbt-docs freshness dag-test trigger backfill checksum benchmark clean
+        dbt-build dbt-docs docs-check freshness dag-test trigger backfill checksum benchmark clean
 
 help:
 	@echo "make up | down | logs | psql | test | lint | dbt-build | backfill START=YYYY-MM-DD END=YYYY-MM-DD"
@@ -81,6 +81,10 @@ dbt-build:
 
 dbt-docs:
 	$(DBT) docs generate --project-dir /opt/project/dbt/ecb_warehouse
+
+## dbt docs + check that every model/source/column is documented and lineage is complete.
+docs-check: dbt-docs
+	$(AF) $(PIPE)/python /opt/project/scripts/check_dbt_docs.py /opt/airflow/dbt-target
 
 freshness:
 	$(DBT) source freshness --project-dir /opt/project/dbt/ecb_warehouse

@@ -1,5 +1,6 @@
 version: 2
 
+# Raw column docs are generated from ingestion/ecb_ingest/config.yaml (a unit test keeps them in sync).
 sources:
   - name: raw
     description: Raw ECB observations loaded by ecb_ingest (one row per observation per load; all text).
@@ -14,12 +15,178 @@ sources:
         freshness:
           warn_after: {count: 24, period: hour}
           error_after: {count: 72, period: hour}
+        columns:
+          - name: series_key
+            description: "KEY: Full ECB series key incl. the flow, e.g. EXR.D.USD.EUR.SP00.A."
+          - name: freq
+            description: "FREQ: SDMX frequency code (D daily, B business day, M monthly)."
+          - name: currency
+            description: "CURRENCY: Currency code (EXR: quoted currency; FM: currency of the rate, EUR)."
+          - name: currency_denom
+            description: "CURRENCY_DENOM: Denominator currency of the exchange rate (EUR)."
+          - name: exr_type
+            description: "EXR_TYPE: Exchange rate type (SP00 = spot)."
+          - name: exr_suffix
+            description: "EXR_SUFFIX: Series variation (A = average or standardised measure)."
+          - name: time_period
+            description: "TIME_PERIOD: Observation period as sent by the API (YYYY-MM-DD, or YYYY-MM for monthly)."
+          - name: obs_value
+            description: "OBS_VALUE: Observation value as text."
+          - name: obs_status
+            description: "OBS_STATUS: SDMX observation status (A = normal value)."
+          - name: obs_conf
+            description: "OBS_CONF: Observation confidentiality status (F = free)."
+          - name: decimals
+            description: "DECIMALS: Number of decimals the ECB publishes for the series."
+          - name: unit
+            description: "UNIT: Unit code of the series."
+          - name: unit_mult
+            description: "UNIT_MULT: Unit multiplier as a power of ten (6 = millions)."
+          - name: title
+            description: "TITLE: Series title."
+          - name: load_id
+            description: "Load that delivered the row (delete+insert unit, ADR 0002)."
+          - name: row_num
+            description: "Row number within the landed file (1-based)."
+          - name: extracted_at
+            description: "When the load called the API (UTC); newest wins in staging."
+          - name: ingested_at
+            description: "When the row was committed to Postgres."
+          - name: source_url
+            description: "Exact API URL of the request."
+          - name: s3_key
+            description: "Key of the raw file in the S3 landing zone."
       - name: est
         description: Euro short-term rate (EST); WT = rate in %, TT = total volume in EUR millions.
+        columns:
+          - name: series_key
+            description: "KEY: Full ECB series key incl. the flow, e.g. EXR.D.USD.EUR.SP00.A."
+          - name: freq
+            description: "FREQ: SDMX frequency code (D daily, B business day, M monthly)."
+          - name: benchmark_item
+            description: "BENCHMARK_ITEM: Benchmark identifier (EU000A2X2A25 = EUR STR)."
+          - name: data_type_est
+            description: "DATA_TYPE_EST: EUR STR data type (WT = rate, TT = total volume)."
+          - name: time_period
+            description: "TIME_PERIOD: Observation period as sent by the API (YYYY-MM-DD, or YYYY-MM for monthly)."
+          - name: obs_value
+            description: "OBS_VALUE: Observation value as text."
+          - name: obs_status
+            description: "OBS_STATUS: SDMX observation status (A = normal value)."
+          - name: conf_status
+            description: "CONF_STATUS: Confidentiality status (F = free)."
+          - name: decimals
+            description: "DECIMALS: Number of decimals the ECB publishes for the series."
+          - name: unit_measure
+            description: "UNIT_MEASURE: Unit of measure (PC = percent, EUR = euro)."
+          - name: unit_mult
+            description: "UNIT_MULT: Unit multiplier as a power of ten (6 = millions)."
+          - name: title
+            description: "TITLE: Series title."
+          - name: load_id
+            description: "Load that delivered the row (delete+insert unit, ADR 0002)."
+          - name: row_num
+            description: "Row number within the landed file (1-based)."
+          - name: extracted_at
+            description: "When the load called the API (UTC); newest wins in staging."
+          - name: ingested_at
+            description: "When the row was committed to Postgres."
+          - name: source_url
+            description: "Exact API URL of the request."
+          - name: s3_key
+            description: "Key of the raw file in the S3 landing zone."
       - name: fm
         description: ECB key interest rates (FM), DFR / MRR_FR / MLFR level in %, one row per calendar day.
+        columns:
+          - name: series_key
+            description: "KEY: Full ECB series key incl. the flow, e.g. EXR.D.USD.EUR.SP00.A."
+          - name: freq
+            description: "FREQ: SDMX frequency code (D daily, B business day, M monthly)."
+          - name: ref_area
+            description: "REF_AREA: Reference area (U2 = euro area)."
+          - name: currency
+            description: "CURRENCY: Currency code (EXR: quoted currency; FM: currency of the rate, EUR)."
+          - name: provider_fm
+            description: "PROVIDER_FM: Provider of the financial-market series (4F = ECB)."
+          - name: instrument_fm
+            description: "INSTRUMENT_FM: Financial-market instrument (KR = key interest rate)."
+          - name: provider_fm_id
+            description: "PROVIDER_FM_ID: Instrument identifier (DFR, MRR_FR, MLFR)."
+          - name: data_type_fm
+            description: "DATA_TYPE_FM: Financial-market data type (LEV = level)."
+          - name: time_period
+            description: "TIME_PERIOD: Observation period as sent by the API (YYYY-MM-DD, or YYYY-MM for monthly)."
+          - name: obs_value
+            description: "OBS_VALUE: Observation value as text."
+          - name: obs_status
+            description: "OBS_STATUS: SDMX observation status (A = normal value)."
+          - name: obs_conf
+            description: "OBS_CONF: Observation confidentiality status (F = free)."
+          - name: decimals
+            description: "DECIMALS: Number of decimals the ECB publishes for the series."
+          - name: unit
+            description: "UNIT: Unit code of the series."
+          - name: unit_mult
+            description: "UNIT_MULT: Unit multiplier as a power of ten (6 = millions)."
+          - name: title
+            description: "TITLE: Series title."
+          - name: load_id
+            description: "Load that delivered the row (delete+insert unit, ADR 0002)."
+          - name: row_num
+            description: "Row number within the landed file (1-based)."
+          - name: extracted_at
+            description: "When the load called the API (UTC); newest wins in staging."
+          - name: ingested_at
+            description: "When the row was committed to Postgres."
+          - name: source_url
+            description: "Exact API URL of the request."
+          - name: s3_key
+            description: "Key of the raw file in the S3 landing zone."
       - name: hicp
         description: Euro-area HICP inflation, annual rate of change in %, monthly.
+        columns:
+          - name: series_key
+            description: "KEY: Full ECB series key incl. the flow, e.g. EXR.D.USD.EUR.SP00.A."
+          - name: freq
+            description: "FREQ: SDMX frequency code (D daily, B business day, M monthly)."
+          - name: ref_area
+            description: "REF_AREA: Reference area (U2 = euro area)."
+          - name: adjustment
+            description: "ADJUSTMENT: Adjustment (N = neither seasonally nor working-day adjusted)."
+          - name: icp_item
+            description: "ICP_ITEM: HICP item (000000 = all items)."
+          - name: data_provider
+            description: "DATA_PROVIDER: Data provider code (4D0 = Eurostat)."
+          - name: icp_suffix
+            description: "ICP_SUFFIX: HICP series variation (ANR = annual rate of change)."
+          - name: time_period
+            description: "TIME_PERIOD: Observation period as sent by the API (YYYY-MM-DD, or YYYY-MM for monthly)."
+          - name: obs_value
+            description: "OBS_VALUE: Observation value as text."
+          - name: obs_status
+            description: "OBS_STATUS: SDMX observation status (A = normal value)."
+          - name: conf_status
+            description: "CONF_STATUS: Confidentiality status (F = free)."
+          - name: decimals
+            description: "DECIMALS: Number of decimals the ECB publishes for the series."
+          - name: unit
+            description: "UNIT: Unit code of the series."
+          - name: unit_mult
+            description: "UNIT_MULT: Unit multiplier as a power of ten (6 = millions)."
+          - name: title
+            description: "TITLE: Series title."
+          - name: load_id
+            description: "Load that delivered the row (delete+insert unit, ADR 0002)."
+          - name: row_num
+            description: "Row number within the landed file (1-based)."
+          - name: extracted_at
+            description: "When the load called the API (UTC); newest wins in staging."
+          - name: ingested_at
+            description: "When the row was committed to Postgres."
+          - name: source_url
+            description: "Exact API URL of the request."
+          - name: s3_key
+            description: "Key of the raw file in the S3 landing zone."
 
   - name: ops
     description: Pipeline metadata written by ecb_ingest.
@@ -27,3 +194,30 @@ sources:
     tables:
       - name: pipeline_runs
         description: One row per load attempt per dataset, plus one 'all' row per fully successful DAG run.
+        columns:
+          - name: run_pk
+            description: "Surrogate key."
+          - name: dataset
+            description: "exr, est, fm, hicp, or 'all' for a DAG run."
+          - name: load_id
+            description: "Load id (DAG run id for 'all')."
+          - name: mode
+            description: "full, incremental, backfill or dag_run."
+          - name: dag_run_id
+            description: "Airflow run id."
+          - name: rows_extracted
+            description: "Rows in the landed file."
+          - name: rows_loaded
+            description: "Rows stored in raw for the load_id."
+          - name: started_at
+            description: "Extraction start (UTC)."
+          - name: finished_at
+            description: "Load commit time (UTC)."
+          - name: status
+            description: "success, no_data or failed."
+          - name: error
+            description: "Error text of a failed load."
+          - name: s3_key
+            description: "Raw file key."
+          - name: source_url
+            description: "API URL."

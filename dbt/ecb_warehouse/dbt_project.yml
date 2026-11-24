@@ -10,6 +10,17 @@ test-paths: ["tests"]
 macro-paths: ["macros"]
 clean-targets: ["target", "logs"]
 
+vars:
+  # Incremental facts re-process the last N days to pick up ECB revisions (spec §3: 7-day look-back).
+  lookback_days: 7
+  # Extra history read on incremental runs so window functions (previous rate, 30-day volatility,
+  # forward fill) see the same rows as a full refresh.
+  window_buffer_days: 90
+  # Monthly HICP: re-process the last N months (flash estimates are revised).
+  hicp_lookback_months: 12
+  # Policy rates: carry a value forward over at most N days without an observation (ADR 0007).
+  max_ffill_days: 7
+
 flags:
   send_anonymous_usage_stats: false
 
