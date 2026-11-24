@@ -32,7 +32,7 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 
 **Open issues**
 - `make` is not installed on Windows by default; the runbook documents `scoop install make`.
-- Metabase uses ~1.5 GB RAM; whole stack ~2.8 GB at idle (`docker stats`).
+- Memory use of the stack: measure with `make stats` (no figure recorded here: only measured numbers are published).
 
 ## M2: Extractor (2026-11-24)
 **Built**
@@ -162,3 +162,27 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 **Open issues**
 - CI has not run on GitHub yet: the repository has no remote. Push (see README) and check the Actions tab;
   the local replica above runs the same scripts.
+
+## M7: README, ADRs, fresh-clone check (2026-11-24)
+**Built**
+- `README.md` per spec §12: pitch + business questions, architecture diagram (mermaid), 3-command quick start,
+  data model (ER diagram + grains), dashboard screenshot, ADR index, data quality, idempotency proof, run time,
+  production changes, limitations, CI badge.
+- `make demo` (first run + dashboard) and a blocking `scripts/run_dag.sh` behind `make trigger` / `make backfill`;
+  `make dashboard` now runs inside the Airflow container (no host Python needed); `make stats`.
+- Removed performance numbers that did not come from `ops.pipeline_runs` or `scripts/` (memory figures, a
+  start-up time estimate) (only measured numbers are published).
+
+**Checks**
+- Run time (`make benchmark`, `ops.pipeline_runs`): median 27.9 s, min 26.0 s, max 35.0 s over the 5 most recent
+  incremental DAG runs (2026-11-24 14:11-14:14 UTC, manually triggered, no new data).
+- Fresh clone (`git clone` into a new folder, new compose project = empty volumes), following only the README:
+  `cp .env.example .env` → `make up` (all services healthy) → `make demo` (DAG run success; 9 dashboard cards
+  created and executed). Loaded exr 30,450 / est 3,662 / fm 27,539 / hicp 142 rows; spec checksum
+  n = 30,450, md5 f025dcf3c13a34e30c3201007da042f8 — identical to the original stack. Clone and volumes removed.
+- `make lint` clean; `make test` 52 passed; `make dag-test` 5 passed.
+
+**Open issues / left for the owner**
+- Push to GitHub and confirm the CI badge turns green (simulated locally in M6, never run on GitHub).
+- Optional: ECB minimum bid rate series for the 2000-2008 MRO gap (ADR 0007).
+- Run-time figure is from same-day manual runs; re-run `make benchmark` after 5 scheduled 18:00 runs.

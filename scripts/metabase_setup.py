@@ -213,9 +213,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"card ok ({rows} rows): {card.name}", file=sys.stderr)
         placed.append((cid, card))
     dash_id = mb.upsert_dashboard(placed, collection_id)
-    result = {"dashboard_url": f"{base}/dashboard/{dash_id}", "cards": len(placed)}
+    shown = os.environ.get("METABASE_DISPLAY_URL", base)  # host URL when run inside a container
+    result = {"dashboard_url": f"{shown}/dashboard/{dash_id}", "cards": len(placed)}
     if args.public:
-        result["public_url"] = f"{base}/public/dashboard/{mb.public_link(dash_id)}"
+        result["public_url"] = f"{shown}/public/dashboard/{mb.public_link(dash_id)}"
     print(json.dumps(result))
     return 0
 

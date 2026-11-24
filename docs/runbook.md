@@ -3,7 +3,8 @@
 Operational notes for the local stack. Spec: `docs/spec.md`.
 
 ## Prerequisites
-- Docker Desktop (WSL2 backend) with at least 6 GB memory for the VM. Metabase alone uses ~1.5 GB.
+- Docker Desktop (WSL2 backend). Seven long-running containers incl. Metabase (JVM capped by `JAVA_OPTS=-Xmx1g`);
+  check actual memory use with `make stats`.
 - GNU make: `scoop install make` (or `winget install GnuWin32.Make`); Python 3.12 for host-side tests.
 
 ## Start / stop

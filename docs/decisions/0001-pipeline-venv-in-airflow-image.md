@@ -10,4 +10,4 @@ Airflow tasks are `@task.bash` commands calling `/opt/pipeline-venv/bin/python -
 Only `airflow-init` builds the image; other services reuse it (parallel builds of one tag race).
 
 **Consequences.** Airflow upgrades and pipeline upgrades are independent. Tasks exchange only small JSON via
-the last stdout line (XCom); larger state lives in S3 manifests. Each task pays a Python start-up (~1 s).
+the last stdout line (XCom); larger state lives in S3 manifests. Each task pays a separate Python start-up.

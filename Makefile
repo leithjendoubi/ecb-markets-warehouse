@@ -20,8 +20,8 @@ WAREHOUSE_USER ?= warehouse
 WAREHOUSE_DB ?= warehouse
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U $(WAREHOUSE_USER) -d $(WAREHOUSE_DB)
 
-.PHONY: help env venv build up down logs ps psql migrate test test-integration lint format \
-        dbt-build dbt-docs docs-check dashboard dashboard-screenshot freshness dag-test trigger backfill checksum benchmark clean
+.PHONY: help env venv build up down logs ps stats psql migrate test test-integration lint format \
+        demo dbt-build dbt-docs docs-check dashboard dashboard-screenshot freshness dag-test trigger backfill checksum benchmark clean
 
 help:
 	@echo "make up | down | logs | psql | test | lint | dbt-build | backfill START=YYYY-MM-DD END=YYYY-MM-DD"
@@ -51,6 +51,10 @@ logs:
 
 ps:
 	$(COMPOSE) ps
+
+## Current CPU / memory per container.
+stats:
+	docker stats --no-stream --format "table {{.Name}}	{{.CPUPerc}}	{{.MemUsage}}"
 
 psql:
 	$(COMPOSE) exec postgres psql -U $(WAREHOUSE_USER) -d $(WAREHOUSE_DB)
@@ -88,7 +92,7 @@ docs-check: dbt-docs
 
 ## Create/update the Metabase dashboard from docs/dashboard.md (admin + read-only connection on first run).
 dashboard:
-	$(PY) scripts/metabase_setup.py
+	$(AF) env METABASE_URL=http://metabase:3000 METABASE_DISPLAY_URL=http://localhost:$(METABASE_PORT) $(PIPE)/python /opt/project/scripts/metabase_setup.py
 
 ## Re-render docs/img/dashboard.png (headless Chrome/Edge via a public dashboard link).
 dashboard-screenshot:
@@ -104,17 +108,20 @@ dag-test:
 	$(AF) airflow dags list
 	$(AF) python /opt/project/tests/dags/test_ecb_daily.py
 
-## Trigger one normal (incremental) run of the DAG.
+## Run the DAG once now (incremental; the very first run loads full history) and wait for the result.
 trigger:
-	$(AF) airflow dags unpause $(DAG)
-	$(AF) airflow dags trigger $(DAG)
+	$(AF) bash /opt/project/scripts/run_dag.sh
+
+## Quick start step 3: first run (full history) + Metabase dashboard.
+demo: trigger dashboard
+	@echo "Airflow  http://localhost:$(AIRFLOW_PORT)   (user $(AIRFLOW_ADMIN_USER), password in .env)"
+	@echo "Metabase http://localhost:$(METABASE_PORT)  (user $(METABASE_ADMIN_EMAIL), password in .env)"
 
 ## Manual backfill: re-extract an observation range for every dataset (watermarks untouched).
 backfill:
 	$(if $(START),,$(error usage: make backfill START=YYYY-MM-DD END=YYYY-MM-DD))
 	$(if $(END),,$(error usage: make backfill START=YYYY-MM-DD END=YYYY-MM-DD))
-	$(AF) airflow dags unpause $(DAG)
-	$(AF) airflow dags trigger $(DAG) --conf "{\"start\": \"$(START)\", \"end\": \"$(END)\"}"
+	$(AF) bash /opt/project/scripts/run_dag.sh "{\"start\": \"$(START)\", \"end\": \"$(END)\"}"
 
 ## Idempotency proof (spec §7): row count + checksum of fct_fx_rate_daily.
 checksum:
