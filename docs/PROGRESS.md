@@ -134,3 +134,31 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 
 **Open issues**
 - ECB revisions older than the 7-day look-back need `dbt build --full-refresh` (documented in ADR 0008).
+
+## M6: Metabase dashboard, CI workflow, pre-commit (2026-11-24)
+**Built**
+- `docs/dashboard.md`: 9 native-SQL cards for Q1-Q4, marts only; single source for
+  `scripts/metabase_setup.py` (`make dashboard`: idempotent API setup, read-only connection, runs every card).
+- `scripts/dashboard_screenshot.py` (`make dashboard-screenshot`) -> `docs/img/dashboard.png`.
+- `.github/workflows/ci.yml` (jobs lint-unit, integration-dbt, dag) driven by `scripts/ci/start_postgres.sh`,
+  `scripts/ci/integration.sh`, `scripts/ci/load_fixtures.py`, `scripts/ci/fact_checksums.py`.
+- `.pre-commit-config.yaml` (pre-commit-hooks v6.0.0, ruff v0.17.6, sqlfluff 4.5.0, no-.env guard); hook installed.
+
+**Checks**
+- `make dashboard`: 9 cards created, each query executed OK as the read-only user; that user gets
+  "permission denied for schema raw". Screenshot reviewed: all Q1-Q4 cards render with data.
+- CI simulated locally in clean Linux containers from the git-tracked files only:
+  lint-unit: ruff + sqlfluff clean, 52 unit tests passed; integration-dbt: 5 integration tests passed, fixtures
+  loaded (exr 110 / est 22 / fm 45 / hicp 34 rows), `dbt build` PASS=115 ERROR=0, docs check OK,
+  full-refresh checksums identical; dag: 5 DAG tests passed on the standalone image.
+- Broken test fails CI: removing USD from the accepted currencies -> `FAIL 1 accepted_values_stg_ecb__exr...`,
+  `ERROR=1 SKIP=56`, `integration.sh` exit code 1.
+- `pre-commit run --all-files`: all hooks passed.
+
+**Found and fixed**
+- Metabase displays at most 2,000 rows per question: the daily Q2.1 series hit the cap, now weekly (374 rows).
+- The S3 smoke test needs SeaweedFS: marked `stack`, excluded from CI (`integration and not stack`).
+
+**Open issues**
+- CI has not run on GitHub yet: the repository has no remote. Push (see README) and check the Actions tab;
+  the local replica above runs the same scripts.

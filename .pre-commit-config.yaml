@@ -1,0 +1,35 @@
+# pre-commit install   (then hooks run on every commit;  pre-commit run --all-files  to check everything)
+# Versions match pyproject.toml pins.
+exclude: ^tests/fixtures/   # real API responses are kept byte-for-byte
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: check-merge-conflict
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.6
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+
+  - repo: https://github.com/sqlfluff/sqlfluff
+    rev: 4.5.0
+    hooks:
+      - id: sqlfluff-lint
+        files: ^(dbt/ecb_warehouse/(models|tests|snapshots)|scripts|sql)/.*\.sql$
+
+  - repo: local
+    hooks:
+      - id: no-dotenv
+        name: never commit .env
+        entry: .env must not be committed (it holds local passwords)
+        language: fail
+        files: ^\.env$

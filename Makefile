@@ -21,7 +21,7 @@ WAREHOUSE_DB ?= warehouse
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -U $(WAREHOUSE_USER) -d $(WAREHOUSE_DB)
 
 .PHONY: help env venv build up down logs ps psql migrate test test-integration lint format \
-        dbt-build dbt-docs docs-check freshness dag-test trigger backfill checksum benchmark clean
+        dbt-build dbt-docs docs-check dashboard dashboard-screenshot freshness dag-test trigger backfill checksum benchmark clean
 
 help:
 	@echo "make up | down | logs | psql | test | lint | dbt-build | backfill START=YYYY-MM-DD END=YYYY-MM-DD"
@@ -85,6 +85,14 @@ dbt-docs:
 ## dbt docs + check that every model/source/column is documented and lineage is complete.
 docs-check: dbt-docs
 	$(AF) $(PIPE)/python /opt/project/scripts/check_dbt_docs.py /opt/airflow/dbt-target
+
+## Create/update the Metabase dashboard from docs/dashboard.md (admin + read-only connection on first run).
+dashboard:
+	$(PY) scripts/metabase_setup.py
+
+## Re-render docs/img/dashboard.png (headless Chrome/Edge via a public dashboard link).
+dashboard-screenshot:
+	$(PY) scripts/dashboard_screenshot.py
 
 freshness:
 	$(DBT) source freshness --project-dir /opt/project/dbt/ecb_warehouse

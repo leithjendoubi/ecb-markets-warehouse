@@ -7,7 +7,7 @@ import pytest
 from ecb_ingest.s3 import S3Store, make_client
 from ecb_ingest.settings import S3Settings
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.stack]
 
 
 def test_boto3_roundtrip_against_seaweedfs():

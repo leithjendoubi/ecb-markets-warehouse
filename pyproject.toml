@@ -39,7 +39,8 @@ ecb_ingest = ["config.yaml"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "integration: needs the docker compose stack (make up) running",
+    "integration: needs PostgreSQL (make up, or CI: scripts/ci/start_postgres.sh)",
+    "stack: needs the full docker compose stack (SeaweedFS S3); not run in CI",
 ]
 addopts = "-m 'not integration'"
 

@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-unit:
+    name: Lint + unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: ruff
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: sqlfluff
+        run: sqlfluff lint dbt/ecb_warehouse/models dbt/ecb_warehouse/tests dbt/ecb_warehouse/snapshots scripts sql
+      - name: unit tests (offline, fixtures only)
+        run: pytest -q
+
+  integration-dbt:
+    name: Integration + dbt build on Postgres 16
+    needs: lint-unit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: start Postgres (same sql/init as docker compose)
+        run: bash scripts/ci/start_postgres.sh ci-postgres "" 5432
+      - name: integration tests, fixture load, dbt build, docs check, full-refresh == incremental
+        run: bash scripts/ci/integration.sh
+
+  dag:
+    name: Airflow DAG tests
+    needs: lint-unit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: build the Airflow image (pinned pipeline venv)
+        run: docker build -f airflow/Dockerfile -t ecbwh-airflow:ci .
+      - name: parse the DAG and run the structure tests
+        run: |
+          docker run --rm -e AIRFLOW__CORE__LOAD_EXAMPLES=false \
+            -v "$PWD/airflow/dags:/opt/airflow/dags:ro" -v "$PWD/tests:/opt/project/tests:ro" \
+            ecbwh-airflow:ci bash -c "airflow db migrate > /dev/null && python /opt/project/tests/dags/test_ecb_daily.py"

@@ -61,3 +61,28 @@ Metabase connects to `warehouse` as the read-only user `WAREHOUSE_RO_USER`, whic
   (`dbt build` = seed + snapshot + models) creates the new version (ADR 0006).
 - To restart incremental extraction from scratch for one dataset, remove its entry from
   `s3://$S3_BUCKET/_state/watermarks.json`; the next run is a full load.
+
+## Dashboard
+- `make dashboard`: creates the Metabase admin (`METABASE_ADMIN_EMAIL`/`_PASSWORD`) on first run, connects
+  Metabase to the warehouse as the read-only user (schema `marts` only), and creates/updates every card in
+  `docs/dashboard.md` plus the dashboard "ECB Markets Warehouse". Each card's query is executed once; a SQL
+  error fails the command.
+- `make dashboard-screenshot`: enables Metabase public sharing (local instance only) and renders the dashboard
+  to `docs/img/dashboard.png` with headless Chrome/Edge in a throwaway profile.
+
+## CI
+`.github/workflows/ci.yml` has three jobs: `lint-unit` (ruff, sqlfluff, offline unit tests), `integration-dbt`
+(Postgres 16 initialised by `sql/init`, integration tests, real fixtures loaded through extract+load,
+`dbt build`, docs check, full refresh == incremental) and `dag` (builds the Airflow image, DAG tests).
+The integration logic lives in `scripts/ci/*.sh` so it can be run the same way locally:
+
+```bash
+bash scripts/ci/start_postgres.sh ci-pg "" 5439          # throwaway Postgres on :5439
+CI_WAREHOUSE_PORT=5439 PYTHON=.venv/Scripts/python bash scripts/ci/integration.sh   # (Linux: .venv/bin/python)
+docker rm -f ci-pg
+```
+Tests marked `stack` (S3 smoke test) need the full compose stack and are not run in CI.
+
+## pre-commit
+`pre-commit install` once; hooks: whitespace/EOF/YAML/JSON, large files, private keys, ruff, sqlfluff, and a guard
+that refuses to commit `.env`. `tests/fixtures/` is excluded (real API responses are kept byte-for-byte).
