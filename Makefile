@@ -7,6 +7,8 @@ else
 VENV_BIN := .venv/bin
 endif
 PY := $(VENV_BIN)/python
+# Git Bash would rewrite container paths like /opt/... into C:/Program Files/Git/opt/...
+export MSYS_NO_PATHCONV := 1
 COMPOSE := docker compose
 # Commands run inside the Airflow scheduler container (LocalExecutor: tasks run there too).
 AF := $(COMPOSE) exec -T airflow-scheduler

@@ -33,3 +33,28 @@ One entry per milestone (spec §9). Numbers below come from commands run during 
 **Open issues**
 - `make` is not installed on Windows by default; the runbook documents `scoop install make`.
 - Metabase uses ~1.5 GB RAM; whole stack ~2.8 GB at idle (`docker stats`).
+
+## M2: Extractor (2026-11-24)
+**Built**
+- `ingestion/ecb_ingest/config.yaml` + `config.py`: 4 datasets (flow, key, start period, raw table, CSV->raw
+  column map). A unit test asserts every mapped column exists in the saved real responses.
+- `client.py`: httpx client; key kept verbatim in the path (`+`), query values percent-encoded; tenacity retries
+  (5 attempts, exponential backoff) on network errors, 408/425/429/5xx; 404 => `has_data=False`.
+- `state.py`: watermarks in `s3://$S3_BUCKET/_state/watermarks.json`, forward-only `advance()`.
+- `extract.py`: modes full / incremental / backfill; lands the response bytes unchanged at
+  `raw/ecb/{dataset}/ingestion_date=YYYY-MM-DD/{load_id}.csv` (write-once), writes a manifest.
+- `cli.py extract`: JSON result on the last stdout line for XCom.
+- ADRs 0001 (pipeline venv), 0002 (load ids + watermarks), 0003 (404 semantics).
+
+**Checks**
+- `make test`: 42 passed, offline (httpx MockTransport serving fixtures; dict-backed fake S3).
+- `ruff check` + `ruff format --check`: clean.
+- Live check (throwaway bucket, deleted afterwards): full EXR extract landed 30,450 rows; with the watermark
+  set, the next run sent `updatedAfter`, got 404, landed nothing (raw object count stayed 1): no-op.
+
+**Found and fixed**
+- The API rejects `updatedAfter` with fractional seconds (HTTP 400, saved as
+  `tests/fixtures/exr_400_fractional_seconds.html`). Watermarks are now truncated to whole seconds (+ tests).
+
+**Open issues**
+- The watermark is advanced by the loader (M3); until then nothing moves it in production.

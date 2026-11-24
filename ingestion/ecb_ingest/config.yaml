@@ -1,0 +1,100 @@
+# Datasets pulled from the ECB Data Portal (spec §3). Keys verified against the live API on 2026-11-24
+# (responses saved in tests/fixtures/). `+` joins several values in one key position.
+#
+# columns: CSV column (exactly as the API returns it) -> raw.<table> column. Only these columns are loaded
+# into Postgres; the full response is kept unchanged in S3. Columns listed in `required` must be present
+# in every response; any other configured column that is missing is loaded as NULL (and logged).
+
+defaults:
+  format: csvdata
+  required: [KEY, TIME_PERIOD, OBS_VALUE]
+
+datasets:
+  exr:
+    description: ECB reference exchange rates, foreign currency units per 1 EUR
+    flow: EXR
+    key: D.USD+GBP+CHF+JPY+CNY+SEK+NOK+PLN+CAD+AUD.EUR.SP00.A
+    start_period: "2015-01-01"
+    raw_table: raw.exr
+    columns:
+      KEY: series_key
+      FREQ: freq
+      CURRENCY: currency
+      CURRENCY_DENOM: currency_denom
+      EXR_TYPE: exr_type
+      EXR_SUFFIX: exr_suffix
+      TIME_PERIOD: time_period
+      OBS_VALUE: obs_value
+      OBS_STATUS: obs_status
+      OBS_CONF: obs_conf
+      DECIMALS: decimals
+      UNIT: unit
+      UNIT_MULT: unit_mult
+      TITLE: title
+
+  est:
+    description: Euro short-term rate (WT = volume-weighted trimmed mean rate, TT = total volume)
+    flow: EST
+    key: B.EU000A2X2A25.WT+TT
+    start_period: "2019-10-01"
+    raw_table: raw.est
+    columns:
+      KEY: series_key
+      FREQ: freq
+      BENCHMARK_ITEM: benchmark_item
+      DATA_TYPE_EST: data_type_est
+      TIME_PERIOD: time_period
+      OBS_VALUE: obs_value
+      OBS_STATUS: obs_status
+      CONF_STATUS: conf_status
+      DECIMALS: decimals
+      UNIT_MEASURE: unit_measure
+      UNIT_MULT: unit_mult
+      TITLE: title
+
+  fm:
+    description: ECB key interest rates (DFR deposit facility, MRR_FR main refinancing fixed rate, MLFR marginal lending)
+    flow: FM
+    key: D.U2.EUR.4F.KR.DFR+MRR_FR+MLFR.LEV
+    start_period: "1999-01-01"
+    raw_table: raw.fm
+    columns:
+      KEY: series_key
+      FREQ: freq
+      REF_AREA: ref_area
+      CURRENCY: currency
+      PROVIDER_FM: provider_fm
+      INSTRUMENT_FM: instrument_fm
+      PROVIDER_FM_ID: provider_fm_id
+      DATA_TYPE_FM: data_type_fm
+      TIME_PERIOD: time_period
+      OBS_VALUE: obs_value
+      OBS_STATUS: obs_status
+      OBS_CONF: obs_conf
+      DECIMALS: decimals
+      UNIT: unit
+      UNIT_MULT: unit_mult
+      TITLE: title
+
+  hicp:
+    description: Euro area HICP, overall index, annual rate of change (%)
+    flow: HICP
+    key: M.U2.N.000000.4D0.ANR
+    start_period: "2015-01"
+    raw_table: raw.hicp
+    columns:
+      KEY: series_key
+      FREQ: freq
+      REF_AREA: ref_area
+      ADJUSTMENT: adjustment
+      ICP_ITEM: icp_item
+      DATA_PROVIDER: data_provider
+      ICP_SUFFIX: icp_suffix
+      TIME_PERIOD: time_period
+      OBS_VALUE: obs_value
+      OBS_STATUS: obs_status
+      CONF_STATUS: conf_status
+      DECIMALS: decimals
+      UNIT: unit
+      UNIT_MULT: unit_mult
+      TITLE: title
