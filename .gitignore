@@ -1,0 +1,29 @@
+# secrets / local env
+.env
+infra/s3.rendered.json
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# dbt
+dbt/ecb_warehouse/target/
+dbt/ecb_warehouse/logs/
+dbt/ecb_warehouse/dbt_packages/
+logs/
+
+# airflow
+airflow/logs/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# source PDFs (docs/spec.md is the canonical spec)
+/*.pdf

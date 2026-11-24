@@ -1,0 +1,17 @@
+HTTP/1.1 200 OK
+Server: myracloud
+Date: Tue, 24 Nov 2026 13:07:06 GMT
+Content-Type: text/csv
+Transfer-Encoding: chunked
+Connection: keep-alive
+Cache-Control: max-age=30
+Content-Disposition: attachment;filename=data.csv
+Last-Modified: Tue, 24 Nov 2026 07:04:54 GMT
+Strict-Transport-Security: max-age=31536000 ; includeSubDomains
+Vary: accept
+X-Content-Type-Options: nosniff
+X-Correlation-Id: 09894356-3eb2-4b6e-b807-9cfef6fe3a81
+X-Frame-Options: DENY
+X-Xss-Protection: 0
+Expires: Tue, 24 Nov 2026 13:07:36 GMT
+

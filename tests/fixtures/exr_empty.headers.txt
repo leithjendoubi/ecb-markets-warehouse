@@ -1,0 +1,16 @@
+HTTP/1.1 404 Not Found
+Server: myracloud
+Date: Tue, 24 Nov 2026 13:07:12 GMT
+Content-Type: application/problem+json
+Transfer-Encoding: chunked
+Connection: keep-alive
+Cache-Control: max-age=60, proxy-revalidate, no-transform
+Content-Disposition: 
+Last-Modified: Tue, 24 Nov 2026 13:07:10 GMT
+Strict-Transport-Security: max-age=31536000 ; includeSubDomains
+Vary: accept
+X-Content-Type-Options: nosniff
+X-Correlation-Id: 1eabec1f-7b09-4ffb-bcb8-a84f6ce45a34
+X-Frame-Options: DENY
+X-Xss-Protection: 0
+

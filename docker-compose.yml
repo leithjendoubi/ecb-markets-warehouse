@@ -1,0 +1,220 @@
+# ecb-markets-warehouse local stack.
+# Airflow section adapted from the official Airflow 3.4.0 docker-compose.yaml (LocalExecutor, no Celery/Redis).
+# All versions are pinned. Configuration comes from .env (see .env.example).
+
+x-airflow-common: &airflow-common
+  # Built once by airflow-init (below); the other Airflow services reuse the local image.
+  image: ecbwh-airflow:3.4.0-py3.12
+  pull_policy: never
+  env_file:
+    - .env
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://airflow:${AIRFLOW_DB_PASSWORD}@postgres:5432/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: Europe/Berlin
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET}
+    AIRFLOW__API_AUTH__JWT_ISSUER: airflow
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
+    AIRFLOW__DAG_PROCESSOR__REFRESH_INTERVAL: "30"
+    # Pipeline runtime (overrides the host-oriented values from .env)
+    WAREHOUSE_HOST: postgres
+    WAREHOUSE_PORT: "5432"
+    S3_ENDPOINT_URL: http://seaweedfs:8333
+    PROJECT_DIR: /opt/project
+    PYTHONPATH: /opt/project/ingestion
+    DBT_PROFILES_DIR: /opt/project/dbt/ecb_warehouse
+    DBT_PROJECT_DIR: /opt/project/dbt/ecb_warehouse
+    DBT_TARGET_PATH: /opt/airflow/dbt-target
+    DBT_LOG_PATH: /opt/airflow/dbt-logs
+    DBT_SEND_ANONYMOUS_USAGE_STATS: "false"
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - airflow-logs:/opt/airflow/logs
+    - ./ingestion:/opt/project/ingestion:ro
+    - ./dbt:/opt/project/dbt
+    - ./scripts:/opt/project/scripts:ro
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+    seaweedfs:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16.16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: postgres
+      AIRFLOW_DB_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+      METABASE_DB_PASSWORD: ${METABASE_DB_PASSWORD}
+      WAREHOUSE_DB: ${WAREHOUSE_DB}
+      WAREHOUSE_USER: ${WAREHOUSE_USER}
+      WAREHOUSE_PASSWORD: ${WAREHOUSE_PASSWORD}
+      WAREHOUSE_RO_USER: ${WAREHOUSE_RO_USER}
+      WAREHOUSE_RO_PASSWORD: ${WAREHOUSE_RO_PASSWORD}
+    ports:
+      - "${WAREHOUSE_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./sql/init:/docker-entrypoint-initdb.d:ro
+      - ./scripts:/opt/scripts:ro
+    healthcheck:
+      # TCP (not the socket): during initdb the server only listens on the socket, so this
+      # turns healthy only after sql/init has fully run and the real server has started.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres && psql -h 127.0.0.1 -U postgres -d $${WAREHOUSE_DB} -tAc \"select 1 from pg_namespace where nspname='ops'\" | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.55
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    # Render the credential template (no secrets in Git) and start master+volume+filer+S3 in one process.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        sed -e "s|__S3_ACCESS_KEY__|$${S3_ACCESS_KEY}|" -e "s|__S3_SECRET_KEY__|$${S3_SECRET_KEY}|"
+        /etc/seaweedfs/s3.template.json > /tmp/s3.json &&
+        exec weed server -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -volume.max=0 -master.volumeSizeLimitMB=1024
+        -s3 -s3.port=8333 -s3.config=/tmp/s3.json
+    ports:
+      - "${S3_PORT:-8333}:8333"
+    volumes:
+      - seaweedfs-data:/data
+      - ./infra/s3.json:/etc/seaweedfs/s3.template.json:ro
+    healthcheck:
+      # Any HTTP answer from the S3 port (an unauthenticated request gets 403) means the gateway is up.
+      test: ["CMD-SHELL", "curl -s -o /dev/null -w '%{http_code}' http://localhost:8333/ | grep -qE '^(200|403)$'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    restart: unless-stopped
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8974/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 20s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  # One-shot: migrate the Airflow DB, create the admin user, create the S3 bucket.
+  airflow-init:
+    <<: *airflow-common
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
+    pull_policy: build
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -euo pipefail
+        mkdir -p /opt/airflow/logs
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/logs
+        /entrypoint airflow version
+        echo "Ensuring S3 bucket exists"
+        /opt/pipeline-venv/bin/python -m ecb_ingest.cli ensure-bucket
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USER}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    user: "0:0"
+
+  metabase:
+    image: metabase/metabase:v0.64.8.4
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: postgres
+      MB_DB_PORT: "5432"
+      MB_DB_DBNAME: metabase
+      MB_DB_USER: metabase
+      MB_DB_PASS: ${METABASE_DB_PASSWORD}
+      MB_ANON_TRACKING_ENABLED: "false"
+      MB_CHECK_FOR_UPDATES: "false"
+      JAVA_OPTS: -Xmx1g
+    ports:
+      - "${METABASE_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/health | grep -q ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  seaweedfs-data:
+  airflow-logs:
